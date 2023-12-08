@@ -1,9 +1,9 @@
 from typing import Any
 
-import my_rust
-from rlgym.utils.gamestates import PlayerData, GameState, PhysicsObject
+import rlbot_rust_compat
+from rlgym_sim.utils.gamestates import PlayerData, GameState, PhysicsObject
 
-from rlgym.utils.obs_builders import ObsBuilder
+from rlgym_sim.utils.obs_builders import ObsBuilder
 
 import numpy as np
 

@@ -1,19 +1,28 @@
-mod bytes; // replace this with rocketsim_rs with bin feature
+mod bytes; // replace this with rocketsim_rs with bin feature somehoow? Stuff is private though
 mod gym;
 mod utils;
 
+use bytes::Vec3;
+use ndarray::Dim;
+use ndarray::Ix2;
 use pyo3::prelude::*;
 use pyo3::wrap_pymodule;
 use pyo3::{pymodule, types::PyModule, PyResult, Python};
 use numpy::{PyReadonlyArray, PyArray, Ix1, IntoPyArray};
 // use numpy::ndarray::{array, Array};
 
+ use rlgym_sim_rs::{
+     obs_builders::obs_builder::ObsBuilder,
+     reward_functions::reward_fn::RewardFn,
+ };
+
 use crate::{
-    gym::GymState,
+    gym::CompatGameState,
     utils::make_gym_state,
 };
-use bytes::{BallState, CarInfo, CarState, GameState, Team, Vec3};
-use gym::BOOST_PADS_LENGTH;
+
+// use rocketsim_rs::bytes;
+use crate::gym::BOOST_PADS_LENGTH;
 
 use std::sync::RwLock;
 
@@ -31,62 +40,70 @@ fn my_rust(_py: Python, m: &PyModule) -> PyResult<()> {
     // m.add_function(wrap_pymodule!(reset, m)?)?;
     // m.add_function(wrap_pymodule!(pre_step, m)?)?;
     // m.add_function(wrap_pymodule!(build_obs, m)?)?;
-    m.add_class::<ObsBuilder>()?;
+    m.add_class::<CompatObs>()?;
+    m.add_class::<CompatReward>()?;
     Ok(())
 }
 
-#[pyclass]
-struct ObsBuilder {
-    #[pyo3(get, set)]
-    n: usize,
-    kickoff_timer: isize,
-    tick_skip: isize,
-    infinite_boost_odds: f32,
+// #[pyclass]
+// struct CompatObsBuilder {
+//     #[pyo3(get, set)]
+//     n: usize,
+//     kickoff_timer: isize,
+//     tick_skip: isize,
+//     infinite_boost_odds: f32,
+// }
+
+// #[pyclass]
+// struct CompatWrapper{
+//     pub reward_fn: CompatReward,
+//     pub obs_builder: CompatObs
+// }
+
+#[pyclass(unsendable)]
+struct CompatReward{
+    pub reward_fn: Box<dyn RewardFn>,
+}
+
+#[pyclass(unsendable)]
+struct CompatObs{
+    pub obs_builder: Box<dyn ObsBuilder>,
+    previous_actions: Vec<Vec<f32>>,
 }
 
 #[pymethods]
-impl ObsBuilder {
+impl CompatObs {
     #[new]
-    pub fn new(tick_skip: isize, infinite_boost_odds: f32) -> ObsBuilder {
-        ObsBuilder{n: 0,
-            kickoff_timer: 0,
-            tick_skip,
-            infinite_boost_odds}
+    pub fn new(obs_builder: dyn ObsBuilder) -> CompatObs {
+        let previous_actions: Vec<Vec<f32>>;
+        CompatObs{
+            obs_builder,
+            previous_actions
+        }
     }
-    pub fn reset(&mut self, state: GymState){
+    pub fn reset(&mut self, state: CompatGameState){
         let gamestate = make_gym_state(state);
-        self.n = 0;
-        self.kickoff_timer = 0;
-
-    }
-
-    fn pre_step(&mut self, state: GymState){
-        let gamestate = make_gym_state(state);
-        self.n = 0;
-        self.kickoff_timer += 1;
+        self.obs_builder.reset(gamestate);
     }
 
-    fn build_obs<'py>(&mut self, py: Python<'py>, state: GymState, previous_action: PyReadonlyArray<f64, Ix1>) -> PyResult<&'py PyArray<f32, Ix1>>{
+    fn pre_step(&mut self, state: CompatGameState, previous_actions: PyReadonlyArray<f32, Ix2>){
         let gamestate = make_gym_state(state);
-        // println!("{:#?}", gamestate);
-        let player = &gamestate.cars[self.n];
-        // println!("{:#?}", player);
-        let obs = vec![
-            self.kickoff_timer as f32,
-            self.n as f32,
-            player.id as f32,
-            player.state.vel.x / VEL_STD,
-            player.state.vel.y / VEL_STD,
-            player.state.vel.z / VEL_STD,
-            player.state.pos.x / POS_STD,
-            player.state.pos.y / POS_STD,
-            player.state.pos.z / POS_STD,
-            player.state.ang_vel.x / ANG_STD,
-            player.state.ang_vel.y / ANG_STD,
-            player.state.ang_vel.z / ANG_STD
-        ];
+        for previous_action in previous_actions.iter(){
+            gamestate.cars.last_action = previous_action;
+        }
+        self.previous_actions = previous_actions;
+        self.obs_builder.pre_step(&gamestate);
+    }
 
-        self.n += 1;
+    fn build_obs<'py>(&mut self, py: Python<'py>, state: CompatGameState) -> PyResult<Py<PyArray<f32, Ix2>>>{
+        let gamestate = make_gym_state(state);
+        for previous_action in self.previous_actions.iter(){
+            gamestate.cars.last_action = previous_action;
+        }
+        let obs: Vec<Vec<f32>>;
+        for car in gamestate.cars.iter(){
+            obs.push(self.obs_builder.build_obs(&car, &gamestate));
+        }
     
         let obs_array = obs.into_pyarray(py);
         Ok(obs_array)

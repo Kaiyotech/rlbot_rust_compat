@@ -1,7 +1,8 @@
 use crate::{
     bytes::{BoostPad, BoostPadState, BallState, CarInfo, CarState, GameState, Team, Vec3},
-    gym::GymState, BOOST_PADS_LENGTH,
+    gym::CompatGameState, BOOST_PADS_LENGTH,
 };
+// use rocketsim_rs::bytes;
 use glam::{Mat3A, Quat};
 use std::sync::RwLock;
 
@@ -12,7 +13,7 @@ pub fn array_to_quat(array: [f32; 4]) -> Quat {
 
 const TICK_RATE: f32 = 4. / 120.;
 static BOOST_PAD_LOCATIONS: RwLock<[Vec3; BOOST_PADS_LENGTH]> = RwLock::new([Vec3::ZERO; BOOST_PADS_LENGTH]);
-pub fn make_gym_state(gym_state: GymState) -> GameState {
+pub fn make_gym_state(gym_state: CompatGameState) -> GameState {
     // construct the game state
     let game_state = GameState {
         tick_rate: TICK_RATE,
