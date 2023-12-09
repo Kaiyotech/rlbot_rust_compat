@@ -1,6 +1,7 @@
 mod bytes; // replace this with rocketsim_rs with bin feature somehoow? Stuff is private though
 mod gym;
-mod utils;
+mod sim_state;
+mod gym_state;
 
 use bytes::Vec3;
 use ndarray::Dim;
@@ -18,7 +19,8 @@ use numpy::{PyReadonlyArray, PyArray, Ix1, IntoPyArray};
 
 use crate::{
     gym::CompatGameState,
-    utils::make_gym_state,
+    sim_state::make_sim_state,
+    gym_state::RocketsimWrapper,
 };
 
 // use rocketsim_rs::bytes;
@@ -36,12 +38,10 @@ const BOOST_TIMER_STD: f32 = 5.5;
 const DEMO_TIMER_STD: f32 = 3.;
 
 #[pymodule]
-fn my_rust(_py: Python, m: &PyModule) -> PyResult<()> {
-    // m.add_function(wrap_pymodule!(reset, m)?)?;
-    // m.add_function(wrap_pymodule!(pre_step, m)?)?;
-    // m.add_function(wrap_pymodule!(build_obs, m)?)?;
+fn rlbot_rust_compat(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<CompatObs>()?;
     m.add_class::<CompatReward>()?;
+    m.add_class::<CompatWrapper>()?;
     Ok(())
 }
 
@@ -54,11 +54,12 @@ fn my_rust(_py: Python, m: &PyModule) -> PyResult<()> {
 //     infinite_boost_odds: f32,
 // }
 
-// #[pyclass]
-// struct CompatWrapper{
-//     pub reward_fn: CompatReward,
-//     pub obs_builder: CompatObs
-// }
+#[pyclass[unsendable]]
+struct CompatWrapper{
+    pub reward_fn: CompatReward,
+    pub obs_builder: CompatObs,
+    pub sim_wrapper: RocketsimWrapper,
+}
 
 #[pyclass(unsendable)]
 struct CompatReward{
@@ -72,31 +73,40 @@ struct CompatObs{
 }
 
 #[pymethods]
+impl CompatWrapper{
+    #[new]
+    pub fn new(obs_builder: Box<dyn ObsBuilder>, reward_fn: Box<dyn RewardFn>, sim_wrapper: Box<RocketsimWrapper>) -> CompatWrapper{
+        CompatWrapper { reward_fn, obs_builder, sim_wrapper }
+    }
+}
+
+#[pymethods]
 impl CompatObs {
     #[new]
-    pub fn new(obs_builder: dyn ObsBuilder) -> CompatObs {
+    pub fn new(obs_builder: Box<dyn ObsBuilder>) -> CompatObs {
         let previous_actions: Vec<Vec<f32>>;
         CompatObs{
             obs_builder,
-            previous_actions
+            previous_actions,
         }
     }
     pub fn reset(&mut self, state: CompatGameState){
-        let gamestate = make_gym_state(state);
-        self.obs_builder.reset(gamestate);
+        let gamestate = make_sim_state(state);
+        self.obs_builder.reset(&gamestate);
     }
 
-    fn pre_step(&mut self, state: CompatGameState, previous_actions: PyReadonlyArray<f32, Ix2>){
-        let gamestate = make_gym_state(state);
+    fn pre_step(&mut self, py_state: CompatGameState, previous_actions: PyReadonlyArray<f32, Ix2>){
+        let gamestate = make_sim_state(py_state);
+        let state = 
         for previous_action in previous_actions.iter(){
             gamestate.cars.last_action = previous_action;
         }
-        self.previous_actions = previous_actions;
+        self.previous_actions = previous_actions.as_array().as_slice().unwrap();
         self.obs_builder.pre_step(&gamestate);
     }
 
     fn build_obs<'py>(&mut self, py: Python<'py>, state: CompatGameState) -> PyResult<Py<PyArray<f32, Ix2>>>{
-        let gamestate = make_gym_state(state);
+        let gamestate = make_sim_state(state);
         for previous_action in self.previous_actions.iter(){
             gamestate.cars.last_action = previous_action;
         }
