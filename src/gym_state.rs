@@ -664,3 +664,17 @@ impl RocketsimWrapper {
         gamestate
     }
 }
+
+
+pub fn get_car_controls_from_vec(action: &Vec<f32>) -> CarControls{
+    CarControls {
+        throttle: action[0],
+        steer: action[1],
+        pitch: action[2],
+        yaw: action[3],
+        roll: action[4],
+        jump: action[5] > 0.,
+        boost: action[6] > 0.,
+        handbrake: action[7] > 0.,
+    }
+}
