@@ -14,7 +14,8 @@ use pyo3::{pymodule, types::PyModule, PyResult, Python};
 use numpy::{PyReadonlyArray, PyArray, Ix1, IntoPyArray};
 // use numpy::ndarray::{array, Array};
 
- use rlgym_sim_rs::envs::game_match::GameConfig;
+ use rlgym_sim_rs::AdvancedObs;
+use rlgym_sim_rs::envs::game_match::GameConfig;
 use rlgym_sim_rs::obs_builders::obs_builder;
 use rlgym_sim_rs::{
      obs_builders::obs_builder::ObsBuilder,
@@ -36,7 +37,7 @@ use crate::gym::BOOST_PADS_LENGTH;
 use std::sync::RwLock;
 
 const TICK_RATE: f32 = 4. / 120.;
-static BOOST_PAD_LOCATIONS: RwLock<[Vec3; BOOST_PADS_LENGTH]> = RwLock::new([Vec3::ZERO; BOOST_PADS_LENGTH]);
+// static BOOST_PAD_LOCATIONS: RwLock<[Vec3; BOOST_PADS_LENGTH]> = RwLock::new([Vec3::ZERO; BOOST_PADS_LENGTH]);
 const POS_STD: f32 = 2300.0;
 const VEL_STD: f32 = 2300.0;
 const ANG_STD: f32 = 5.5;
@@ -47,7 +48,7 @@ const DEMO_TIMER_STD: f32 = 3.;
 #[pymodule]
 fn rlbot_rust_compat(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<CompatObs>()?;
-    m.add_class::<CompatReward>()?;
+    // m.add_class::<CompatReward>()?;
     // m.add_class::<CompatWrapper>()?;
     Ok(())
 }
@@ -68,16 +69,16 @@ fn rlbot_rust_compat(_py: Python, m: &PyModule) -> PyResult<()> {
 //     pub sim_wrapper: RocketsimWrapper,
 // }
 
-#[pyclass(unsendable)]
-struct CompatReward{
-    pub reward_fn: Box<dyn RewardFn>,
-}
+// #[pyclass(unsendable)]
+// struct CompatReward{
+//     pub reward_fn: Box<dyn RewardFn>,
+// }
 
 #[pyclass(unsendable)]
 struct CompatObs{
     pub obs_builder: Box<dyn ObsBuilder>,
     previous_actions: Vec<Vec<f32>>,
-    simulator: RocketsimWrapper,
+    // simulator: RocketsimWrapper,
     game_config: GameConfig,
 }
 
@@ -93,6 +94,7 @@ struct CompatObs{
 impl CompatObs {
     #[new]
     pub fn new(tick_skip: usize, spawn_opponents: bool, team_size: usize) -> CompatObs {
+        // replace your game config here as necessary
         let game_config = GameConfig {
             tick_skip,
             spawn_opponents,
@@ -100,13 +102,13 @@ impl CompatObs {
             gravity: 1.,
             boost_consumption: 1.,
         };
-        let simulator = RocketsimWrapper::new(game_config);
-        let previous_actions: Vec<Vec<f32>>;
-        let obs_builder = Box::<AdvancedObs::new()>;
+        let obs_builder = Box::new(AdvancedObs::new());
+        // let simulator = RocketsimWrapper::new(game_config);
+        let previous_actions: Vec<Vec<f32>> = vec![vec![]];
         CompatObs{
             obs_builder,
             previous_actions,
-            simulator,
+            // simulator,
             game_config,
         }
     }
@@ -114,6 +116,18 @@ impl CompatObs {
         // let gamestate = make_sim_state(py_state);
         // let state = self.simulator.get_rlgym_gamestate(false).0;
         let state = get_state(py_state);
+        dbg!(state.ball.angular_velocity.z);
+        dbg!(state.players[0].car_id);
+        dbg!(state.players[0].team_num);
+        dbg!(state.players[0].car_data.position.x);
+        dbg!(state.players[0].car_data.angular_velocity.z);
+        dbg!(state.players[3].car_id);
+        dbg!(state.players[3].car_data.position.z);
+        dbg!(state.players[3].team_num);
+        dbg!(state.boost_pads[3]);
+        dbg!(state.inverted_boost_pads[30]);
+        dbg!(state.boost_pads[2]);
+        dbg!(state.inverted_boost_pads[32]);
         self.obs_builder.reset(&state);
     }
 
