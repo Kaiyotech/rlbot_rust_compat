@@ -1,8 +1,8 @@
 use crate::{
-    bytes::{BoostPad, BoostPadState, BallState, CarInfo, CarState, GameState, Team, Vec3},
+    bytes::{BoostPad, BoostPadState, BallState, CarInfo, CarState, Team, Vec3, GameState as SimState},
     gym::CompatGameState, BOOST_PADS_LENGTH,
 };
-use rlgym_sim_rs::gamestates::game_state::GameState as SimState;
+// use rocketsim_rs::{GameState as SimState, sim::BallState};
 // use rocketsim_rs::bytes;
 use glam::{Mat3A, Quat};
 use std::sync::RwLock;
@@ -16,7 +16,7 @@ const TICK_RATE: f32 = 4. / 120.;
 static BOOST_PAD_LOCATIONS: RwLock<[Vec3; BOOST_PADS_LENGTH]> = RwLock::new([Vec3::ZERO; BOOST_PADS_LENGTH]);
 pub fn make_sim_state(gym_state: CompatGameState) -> SimState {
     // construct the game state
-    let game_state = GameState {
+    let game_state = SimState {
         tick_rate: TICK_RATE,
         tick_count: 0,
         ball: BallState {
@@ -61,7 +61,7 @@ pub fn make_sim_state(gym_state: CompatGameState) -> SimState {
             .collect(),
     };
 
-    let gym_state = SimState::new_test();
-    gym_state
+    // let gym_state = SimState::new_test();
+    game_state
 }
 

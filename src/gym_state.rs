@@ -1,9 +1,9 @@
-use rocketsim_rs::{
-    cxx::UniquePtr,
-    math::{RotMat, Vec3},
-    sim::{Arena, CarConfig, CarControls, Team},
-    GameState as GameState_sim,
-};
+// use rocketsim_rs::{
+//     cxx::UniquePtr,
+//     math::{RotMat, Vec3},
+//     sim::{Arena, CarConfig, CarControls, Team},
+//     // GameState as GameState_sim,
+// };
 // use std::cell::RefCell;
 use std::{collections::HashMap, sync::RwLock};
 
@@ -20,6 +20,8 @@ use rlgym_sim_rs::{
     }, 
     envs::game_match::GameConfig,
 };
+
+use crate::bytes::{GameState as SimState, CarControls};
 
 /// used as a means to store stats for a particular agent
 #[derive(Clone, Copy, Debug, Default)]
@@ -75,14 +77,14 @@ impl RocketsimWrapper {
             let mut i = 1;
             // spawn blue cars
             for _ in 0..config.team_size {
-                let car_id = rocket_sim_instance.pin_mut().add_car(Team::BLUE, CarConfig::octane());
+                let car_id = rocket_sim_instance.pin_mut().add_car(Team::Blue, CarConfig::octane());
                 car_id_map.insert(car_id, i);
                 car_ids.push(car_id);
                 i += 1;
             }
             // spawn orange cars
             for _ in 0..config.team_size {
-                let car_id = rocket_sim_instance.pin_mut().add_car(Team::ORANGE, CarConfig::octane());
+                let car_id = rocket_sim_instance.pin_mut().add_car(Team::Orange, CarConfig::octane());
                 car_id_map.insert(car_id, i);
                 car_ids.push(car_id);
                 i += 1;
@@ -247,81 +249,7 @@ impl RocketsimWrapper {
         }
     }
 
-    pub fn set_state(&mut self, state_wrapper: StateWrapper, get_sim_state: bool) -> (GameState_rlgym, Option<GameState_sim>) {
-        let mut sim_state = self.arena.pin_mut().get_game_state();
-
-        // reset boost pads
-        for (i, pad) in sim_state.pads.iter_mut().enumerate() {
-            pad.state = state_wrapper.pads[i];
-            // pad.state.cooldown = 0.;
-        };
-
-        // cars
-
-        // if we need to go from rlgym id to rocketsim id
-        // let mut reverse_id_map = HashMap::new();
-        // self.car_id_map.iter().for_each(|(k, v)| {reverse_id_map.insert(*v, *k);});
-        //
-        for car_info in sim_state.cars.iter_mut() {
-            // find the rocketsim car with the correct id
-            let rlgym_id = *self.car_id_map.get(&(car_info.id)).unwrap();
-            let car_wrapper_op = state_wrapper.cars.iter().find(|car| car.get_car_id() == rlgym_id);
-            let car_wrapper = match car_wrapper_op {
-                Some(val) => val,
-                None => panic!("Unable to find car that had the correct id in the sim from the state wrapper. This is likely an error from the state setter.")
-            };
-            // dbg
-            // let mut car_wrapper = &CarWrapper::new(None, None, None);
-            // for car in state_wrapper.cars.iter() {
-            //     if car.id == rlgym_id {
-            //         car_wrapper = car;
-            //         break
-            //     }
-            // };
-            //
-
-            car_info.state.pos = Vec3::new(car_wrapper.position.x, car_wrapper.position.y, car_wrapper.position.z);
-            car_info.state.vel = Vec3::new(car_wrapper.linear_velocity.x, car_wrapper.linear_velocity.y, car_wrapper.linear_velocity.z);
-            car_info.state.ang_vel = Vec3::new(car_wrapper.angular_velocity.x, car_wrapper.angular_velocity.y, car_wrapper.angular_velocity.z);
-
-            let wrapper_rot_mtx = car_wrapper.rotation.euler_to_rotation();
-            car_info.state.rot_mat = RotMat {
-                forward: Vec3::new(wrapper_rot_mtx.array[0][0], wrapper_rot_mtx.array[1][0], wrapper_rot_mtx.array[2][0]),
-                right: Vec3::new(wrapper_rot_mtx.array[0][1], wrapper_rot_mtx.array[1][1], wrapper_rot_mtx.array[2][1]),
-                up: Vec3::new(wrapper_rot_mtx.array[0][2], wrapper_rot_mtx.array[1][2], wrapper_rot_mtx.array[2][2]),
-            };
-
-            if self.arena.get_mutator_config().boost_used_per_second == 0. {
-                car_info.state.boost = 100.;
-            } else {
-                car_info.state.boost = car_wrapper.boost * 100.;
-            }
-
-            self.arena.pin_mut().set_car_controls(car_info.id, CarControls::default()).unwrap();
-        }
-
-        // ball
-        sim_state.ball.pos = Vec3::new(state_wrapper.ball.position.x, state_wrapper.ball.position.y, state_wrapper.ball.position.z);
-        sim_state.ball.vel = Vec3::new(
-            state_wrapper.ball.linear_velocity.x,
-            state_wrapper.ball.linear_velocity.y,
-            state_wrapper.ball.linear_velocity.z,
-        );
-        sim_state.ball.ang_vel = Vec3::new(
-            state_wrapper.ball.angular_velocity.x,
-            state_wrapper.ball.angular_velocity.y,
-            state_wrapper.ball.angular_velocity.z,
-        );
-
-        self.arena.pin_mut().set_game_state(&sim_state).unwrap();
-
-        // println!("Set ball state");
-        // let sim_state = self.arena.pin_mut().get_game_state();
-        // let gamestate = self.decode_gamestate(sim_state);
-        self.get_rlgym_gamestate(get_sim_state)
-    }
-
-    fn decode_gamestate(&mut self, sim_gamestate: &GameState_sim) -> GameState_rlgym {
+    fn decode_gamestate(&mut self, sim_gamestate: &SimState) -> GameState_rlgym {
         let curr_tick = self.arena.get_tick_count();
 
         let mut ball = PhysicsObject::new();
@@ -507,162 +435,121 @@ impl RocketsimWrapper {
         }
     }
 
-    pub fn set_game_config(&mut self, new_config: GameConfig, get_sim_state: bool) -> (GameState_rlgym, Option<GameState_sim>) {
-        let mut sim_mutator_config = self.arena.get_mutator_config();
-        sim_mutator_config.gravity.z = GRAVITY_Z * new_config.gravity;
-        sim_mutator_config.boost_used_per_second = ROCKETSIM_BOOST_PER_SEC * new_config.boost_consumption;
-        self.arena.pin_mut().set_mutator_config(sim_mutator_config);
+    // pub fn set_game_config(&mut self, new_config: GameConfig, get_sim_state: bool) -> (GameState_rlgym, Option<GameState_sim>) {
+    //     let mut sim_mutator_config = self.arena.get_mutator_config();
+    //     sim_mutator_config.gravity.z = GRAVITY_Z * new_config.gravity;
+    //     sim_mutator_config.boost_used_per_second = ROCKETSIM_BOOST_PER_SEC * new_config.boost_consumption;
+    //     self.arena.pin_mut().set_mutator_config(sim_mutator_config);
 
-        let mut car_ids = self.arena.get_cars();
-        let mut car_blue = 0;
-        let mut car_orange = 0;
-        for car_id in car_ids.iter() {
-            let team = self.arena.get_car_team(*car_id);
-            if team == Team::ORANGE {
-                car_orange += 1;
-            } else {
-                car_blue += 1;
-            }
-        }
+    //     let mut car_ids = self.arena.get_cars();
+    //     let mut car_blue = 0;
+    //     let mut car_orange = 0;
+    //     for car_id in car_ids.iter() {
+    //         let team = self.arena.get_car_team(*car_id);
+    //         if team == Team::ORANGE {
+    //             car_orange += 1;
+    //         } else {
+    //             car_blue += 1;
+    //         }
+    //     }
 
-        // check if car count is the same so that we don't update
-        // let car_count = if new_config.spawn_opponents {
-        //     new_config.team_size * 2
-        // } else {
-        //     new_config.team_size
-        // };
-        let car_count_blue = new_config.team_size;
-        let car_count_orange = if new_config.spawn_opponents {new_config.team_size} else {0};
+    //     // check if car count is the same so that we don't update
+    //     // let car_count = if new_config.spawn_opponents {
+    //     //     new_config.team_size * 2
+    //     // } else {
+    //     //     new_config.team_size
+    //     // };
+    //     let car_count_blue = new_config.team_size;
+    //     let car_count_orange = if new_config.spawn_opponents {new_config.team_size} else {0};
 
-        if car_blue != car_count_blue || car_orange != car_count_orange {
-            for car_id in car_ids.iter() {
-                let err = self.arena.pin_mut().remove_car(*car_id);
-                match err {
-                    Ok(val) => val,
-                    Err(err) => println!("unable to remove car: {err}")
-                };
-            }
+    //     if car_blue != car_count_blue || car_orange != car_count_orange {
+    //         for car_id in car_ids.iter() {
+    //             let err = self.arena.pin_mut().remove_car(*car_id);
+    //             match err {
+    //                 Ok(val) => val,
+    //                 Err(err) => println!("unable to remove car: {err}")
+    //             };
+    //         }
 
-            car_ids.clear();
-            self.car_id_map.clear();
+    //         car_ids.clear();
+    //         self.car_id_map.clear();
     
-            // let mut car_ids = Vec::new();
-            if new_config.spawn_opponents {
-                let mut i = 1;
-                // spawn blue cars
-                for _ in 0..new_config.team_size {
-                    let car_id = self.arena.pin_mut().add_car(Team::BLUE, CarConfig::octane());
-                    self.car_id_map.insert(car_id, i);
-                    car_ids.push(car_id);
-                    i += 1;
-                }
-                // spawn orange cars
-                for _ in 0..new_config.team_size {
-                    let car_id = self.arena.pin_mut().add_car(Team::ORANGE, CarConfig::octane());
-                    self.car_id_map.insert(car_id, i);
-                    car_ids.push(car_id);
-                    i += 1;
-                }
-            } else {
-                let mut i = 1;
-                // spawn blue cars
-                for _ in 0..new_config.team_size as u32 {
-                    let car_id = self.arena.pin_mut().add_car(Team::BLUE, CarConfig::octane());
-                    self.car_id_map.insert(car_id, i);
-                    car_ids.push(car_id);
-                    i += 1;
-                }
-            }
-        }
-        // for car_id in car_ids {
-        //     let err = self.arena.pin_mut().remove_car(car_id);
-        //     match err {
-        //         Ok(val) => val,
-        //         Err(err) => println!("unable to remove car: {err}")
-        //     };
-        // }
+    //         // let mut car_ids = Vec::new();
+    //         if new_config.spawn_opponents {
+    //             let mut i = 1;
+    //             // spawn blue cars
+    //             for _ in 0..new_config.team_size {
+    //                 let car_id = self.arena.pin_mut().add_car(Team::BLUE, CarConfig::octane());
+    //                 self.car_id_map.insert(car_id, i);
+    //                 car_ids.push(car_id);
+    //                 i += 1;
+    //             }
+    //             // spawn orange cars
+    //             for _ in 0..new_config.team_size {
+    //                 let car_id = self.arena.pin_mut().add_car(Team::ORANGE, CarConfig::octane());
+    //                 self.car_id_map.insert(car_id, i);
+    //                 car_ids.push(car_id);
+    //                 i += 1;
+    //             }
+    //         } else {
+    //             let mut i = 1;
+    //             // spawn blue cars
+    //             for _ in 0..new_config.team_size as u32 {
+    //                 let car_id = self.arena.pin_mut().add_car(Team::BLUE, CarConfig::octane());
+    //                 self.car_id_map.insert(car_id, i);
+    //                 car_ids.push(car_id);
+    //                 i += 1;
+    //             }
+    //         }
+    //     }
+    //     // for car_id in car_ids {
+    //     //     let err = self.arena.pin_mut().remove_car(car_id);
+    //     //     match err {
+    //     //         Ok(val) => val,
+    //     //         Err(err) => println!("unable to remove car: {err}")
+    //     //     };
+    //     // }
 
-        // let mut car_ids = Vec::new();
-        // if new_config.spawn_opponents {
-        //     // spawn blue cars
-        //     for _ in 0..new_config.team_size {
-        //         car_ids.push(self.arena.pin_mut().add_car(Team::BLUE, CarConfig::octane()));
-        //     }
-        //     // spawn orange cars
-        //     for _ in 0..new_config.team_size {
-        //         car_ids.push(self.arena.pin_mut().add_car(Team::ORANGE, CarConfig::octane()));
-        //     }
-        // } else {
-        //     // spawn blue cars
-        //     for _ in 0..new_config.team_size {
-        //         car_ids.push(self.arena.pin_mut().add_car(Team::BLUE, CarConfig::octane()));
-        //     }
-        // }
+    //     // let mut car_ids = Vec::new();
+    //     // if new_config.spawn_opponents {
+    //     //     // spawn blue cars
+    //     //     for _ in 0..new_config.team_size {
+    //     //         car_ids.push(self.arena.pin_mut().add_car(Team::BLUE, CarConfig::octane()));
+    //     //     }
+    //     //     // spawn orange cars
+    //     //     for _ in 0..new_config.team_size {
+    //     //         car_ids.push(self.arena.pin_mut().add_car(Team::ORANGE, CarConfig::octane()));
+    //     //     }
+    //     // } else {
+    //     //     // spawn blue cars
+    //     //     for _ in 0..new_config.team_size {
+    //     //         car_ids.push(self.arena.pin_mut().add_car(Team::BLUE, CarConfig::octane()));
+    //     //     }
+    //     // }
 
-        self.arena.pin_mut().reset_to_random_kickoff(None);
+    //     self.arena.pin_mut().reset_to_random_kickoff(None);
 
-        // init stats
-        Self::STATS.with(|stats| {
-            let mut guard = stats.write().unwrap();
-            guard.clear();
-            for id in car_ids.iter() {
-                guard.push((*id, Stats::default()));
-            }
-        });
+    //     // init stats
+    //     Self::STATS.with(|stats| {
+    //         let mut guard = stats.write().unwrap();
+    //         guard.clear();
+    //         for id in car_ids.iter() {
+    //             guard.push((*id, Stats::default()));
+    //         }
+    //     });
 
-        self.car_ids = car_ids;
-        self.tick_skip = new_config.tick_skip;
+    //     self.car_ids = car_ids;
+    //     self.tick_skip = new_config.tick_skip;
 
-        self.get_rlgym_gamestate(get_sim_state)
-    }
+    //     self.get_rlgym_gamestate(get_sim_state)
+    // }
 
-    pub fn get_rlgym_gamestate(&mut self, get_sim_state: bool) -> (GameState_rlgym, Option<GameState_sim>) {
-        let rlsim_gamestate = self.arena.pin_mut().get_game_state();
-        if get_sim_state {
-            (self.decode_gamestate(&rlsim_gamestate), Some(rlsim_gamestate))
-        } else {
-            (self.decode_gamestate(&rlsim_gamestate), None)
-        }
+    pub fn get_rlgym_gamestate(&mut self, gamestate: &SimState) -> GameState_rlgym {
+        let rlsim_gamestate = gamestate;
+        self.decode_gamestate(&rlsim_gamestate)
         // self.decode_gamestate(&rlsim_gamestate)
     }
 
-    /// clone actions before this to set prev_acts
-    pub fn step(&mut self, actions: Vec<Vec<f32>>, get_sim_state: bool) -> (GameState_rlgym, Option<GameState_sim>) {
-        let mut acts = Vec::<(u32, CarControls)>::new();
-
-        // package spectator ids with the corresponding action to send to arena
-        for (spectator_id, action) in self.car_ids.iter().zip(actions) {
-            acts.push((
-                *spectator_id,
-                CarControls {
-                    throttle: action[0],
-                    steer: action[1],
-                    pitch: action[2],
-                    yaw: action[3],
-                    roll: action[4],
-                    jump: action[5] > 0.,
-                    boost: action[6] > 0.,
-                    handbrake: action[7] > 0.,
-                },
-            ));
-        }
-
-        self.arena.pin_mut().set_all_controls(&acts).unwrap();
-
-        self.arena.pin_mut().step(1);
-
-        let gamestate = self.get_rlgym_gamestate(get_sim_state);
-
-        // originally was here
-        // self.arena.pin_mut().step(self.tick_skip as i32);
-
-        // TODO: need to somehow extract ball hit information from every step probably
-        if self.tick_skip > 1 {
-            self.arena.pin_mut().step(self.tick_skip as i32 - 1);
-        }
-
-        gamestate
-    }
 }
 
 

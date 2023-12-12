@@ -48,7 +48,7 @@ pub struct CompatGameState {
     // pub game_type: f32,
     // pub blue_score: f32,
     // pub orange_score: f32,
-    // pub last_touch: f32,
+    pub last_touch: f32,
     pub ball: CompatPhysicsObject,
     pub boost_pads: [f32; BOOST_PADS_LENGTH],
     pub players: Vec<CompatPlayerData>,
