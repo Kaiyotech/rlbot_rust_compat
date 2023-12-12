@@ -1,9 +1,10 @@
-mod bytes; // replace this with rocketsim_rs with bin feature somehoow? Stuff is private though
+// mod bytes; // replace this with rocketsim_rs with bin feature somehoow? Stuff is private though
 mod gym;
-mod sim_state;
+// mod sim_state;
 mod gym_state;
+mod conversion;
 
-use bytes::Vec3;
+// use bytes::Vec3;
 use gym_state::get_car_controls_from_vec;
 use ndarray::Dim;
 use ndarray::Ix2;
@@ -14,6 +15,7 @@ use numpy::{PyReadonlyArray, PyArray, Ix1, IntoPyArray};
 // use numpy::ndarray::{array, Array};
 
  use rlgym_sim_rs::envs::game_match::GameConfig;
+use rlgym_sim_rs::obs_builders::obs_builder;
 use rlgym_sim_rs::{
      obs_builders::obs_builder::ObsBuilder,
      reward_functions::reward_fn::RewardFn,
@@ -22,9 +24,11 @@ use rlgym_sim_rs::{
 use crate::{
     gym::CompatGameState,
     gym::CompatPlayerData,
-    sim_state::make_sim_state,
+    // sim_state::make_sim_state,
     gym_state::RocketsimWrapper,
 };
+
+use conversion::get_state;
 
 // use rocketsim_rs::bytes;
 use crate::gym::BOOST_PADS_LENGTH;
@@ -88,7 +92,7 @@ struct CompatObs{
 #[pymethods]
 impl CompatObs {
     #[new]
-    pub fn new(obs_builder: Box<dyn ObsBuilder>, tick_skip: usize, spawn_opponents: bool, team_size: usize) -> CompatObs {
+    pub fn new(tick_skip: usize, spawn_opponents: bool, team_size: usize) -> CompatObs {
         let game_config = GameConfig {
             tick_skip,
             spawn_opponents,
@@ -98,6 +102,7 @@ impl CompatObs {
         };
         let simulator = RocketsimWrapper::new(game_config);
         let previous_actions: Vec<Vec<f32>>;
+        let obs_builder = Box::<AdvancedObs::new()>;
         CompatObs{
             obs_builder,
             previous_actions,
@@ -105,29 +110,30 @@ impl CompatObs {
             game_config,
         }
     }
-    pub fn reset(&mut self, py_state: CompatGameState){
-        let gamestate = make_sim_state(py_state);
-        let state = self.simulator.get_rlgym_gamestate(false).0;
+    pub fn reset(&mut self, py_state: &PyAny){
+        // let gamestate = make_sim_state(py_state);
+        // let state = self.simulator.get_rlgym_gamestate(false).0;
+        let state = get_state(py_state);
         self.obs_builder.reset(&state);
     }
 
-    fn pre_step(&mut self, py_state: CompatGameState, previous_actions: PyReadonlyArray<f32, Ix2>){
-        let gamestate = make_sim_state(py_state);
-        let state = self.simulator.get_rlgym_gamestate(false).0;
-        for (i, previous_action) in previous_actions.to_vec().unwrap().iter().enumerate(){
-            state.players[i].last_actions = get_car_controls_from_vec(&vec![*previous_action]);
-        }
-        self.obs_builder.pre_step(&gamestate, &self.game_config);
-    }
+//     fn pre_step(&mut self, py_state: CompatGameState, previous_actions: PyReadonlyArray<f32, Ix2>){
+//         let gamestate = make_sim_state(py_state);
+//         let state = self.simulator.get_rlgym_gamestate(false).0;
+//         for (i, previous_action) in previous_actions.to_vec().unwrap().iter().enumerate(){
+//             state.players[i].last_actions = get_car_controls_from_vec(&vec![*previous_action]);
+//         }
+//         self.obs_builder.pre_step(&gamestate, &self.game_config);
+//     }
 
-    fn build_obs<'py>(&mut self, py: Python<'py>, player: CompatPlayerData, state: CompatGameState, _previous_action: PyReadonlyArray<f32, Ix1>) -> PyResult<Py<PyArray<f32, Ix1>>>{
-        let gamestate = make_sim_state(state);
-        let id: usize = player.car_id as usize;
-        let state = self.simulator.get_rlgym_gamestate(false).0;
-        let obs = self.obs_builder.build_obs(&state.players[id - 1], &state, &self.game_config);
+//     fn build_obs<'py>(&mut self, py: Python<'py>, player: CompatPlayerData, state: CompatGameState, _previous_action: PyReadonlyArray<f32, Ix1>) -> PyResult<Py<PyArray<f32, Ix1>>>{
+//         let gamestate = make_sim_state(state);
+//         let id: usize = player.car_id as usize;
+//         let state = self.simulator.get_rlgym_gamestate(false).0;
+//         let obs = self.obs_builder.build_obs(&state.players[id - 1], &state, &self.game_config);
     
-        // let obs_array = obs.into_pyarray(py);
-        let obs_array = PyArray::from_vec(py, obs).into();
-        Ok(obs_array)
-    }
+//         // let obs_array = obs.into_pyarray(py);
+//         let obs_array = PyArray::from_vec(py, obs).into();
+//         Ok(obs_array)
+//     }
 }
