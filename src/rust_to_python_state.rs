@@ -11,7 +11,7 @@ const BALL_STATE_LENGTH: usize = 18;
 const PLAYER_CAR_STATE_LENGTH: usize = 13;
 const PLAYER_TERTIARY_INFO_LENGTH: usize = 11;
 const PLAYER_INFO_LENGTH: usize = 2 + 2 * PLAYER_CAR_STATE_LENGTH + PLAYER_TERTIARY_INFO_LENGTH;
-const MAX_SIZE: usize = 3 + BOOST_PAD_LENGTH + BALL_STATE_LENGTH + 6 * PLAYER_INFO_LENGTH;
+const MAX_SIZE: usize = 3 + 2 * BOOST_PAD_LENGTH + BALL_STATE_LENGTH + 6 * PLAYER_INFO_LENGTH;
 
 
 pub fn set_state(state: GameState) -> Vec<f32>{
@@ -20,6 +20,7 @@ pub fn set_state(state: GameState) -> Vec<f32>{
     state_floats.push(state.blue_score as f32);
     state_floats.push(state.orange_score as f32);
     state_floats.extend(state.boost_pads);
+    state_floats.extend(state.inverted_boost_pads);
     state_floats.extend(get_ball_object_floats(&state.ball));
     state_floats.extend(get_ball_object_floats(&state.inverted_ball));
 
