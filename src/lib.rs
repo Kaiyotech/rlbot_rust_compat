@@ -1,4 +1,5 @@
 mod python_to_rust_state;
+mod rust_to_python_state;
 
 use ndarray::{Ix2, Ix1, ArrayView2, Axis};
 use pyo3::{prelude::*, pymodule, types::PyModule, PyResult, Python};
@@ -7,8 +8,8 @@ use numpy::{PyReadonlyArray, PyArray};
 use rlgym_sim_rs::{AdvancedObs, reward_functions::{common_rewards::player_ball_rewards::VelocityPlayerToBallReward, reward_fn::RewardFn},
  envs::game_match::GameConfig, obs_builders::obs_builder::ObsBuilder};
 
-use python_to_rust_state::{get_state, get_car_controls_from_vec, get_player};
-
+pub use python_to_rust_state::{get_state, get_car_controls_from_vec, get_player};
+pub use rust_to_python_state::set_state;
 
 #[pymodule]
 fn rlbot_rust_compat(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -99,3 +100,6 @@ impl CompatReward{
         Ok(reward)
     }
 }
+
+
+// example to test state to python
