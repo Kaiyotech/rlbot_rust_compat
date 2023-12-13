@@ -26,20 +26,13 @@ class TestObsBuilder(ObsBuilder):
                                                             spawn_opponents=spawn_opponents)
 
     def reset(self, initial_state: GameState):
-        initial_state.ball.angular_velocity[2] = 250
-        initial_state.boost_pads[3] = 1
-        initial_state.players[3].car_data.position[2] = 100
-        initial_state.players[0].car_data.position[0] = 50
-        initial_state.players[0].car_data.angular_velocity[2] = 75
         self.rust_obs_builder.reset(initial_state)
 
-    def pre_step(self, state: GameState):
-        # self.rust_obs_builder.pre_step(state)
-        pass
+    def pre_step(self, state: GameState, previous_actions: np.ndarray):
+        self.rust_obs_builder.pre_step(state, previous_actions)
 
-    def build_obs(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> Any:
-        # obs = self.rust_obs_builder.build_obs(state, previous_action)
-        pass
+    def build_obs(self, player: PlayerData, state: GameState, _previous_action: np.ndarray) -> Any:
+        obs = self.rust_obs_builder.build_obs(player, state, _previous_action)
         return obs
 
     # def get_obs_space(self) -> Space:
@@ -68,7 +61,7 @@ if __name__ == "__main__":
             # actions = np.asarray([0] * 8), np.asarray([0] * 8)
             # actions = np.asarray(
             #     [np.asarray([1, 0.5, 0.5, 0.5, 0, 0, 1, 0]), np.asarray([1, 0.5, 0.5, 0.5, 0, 0, 1, 0])])
-            actions = np.asarray(([0.], [0.], [0.], [0.]))
+            actions = np.asarray(([0], [0], [0], [0]))
             new_obs, reward, done, game_state = env.step(actions)
             obs = new_obs
             steps += 1

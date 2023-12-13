@@ -1,9 +1,8 @@
 // takes a python object and makes it into a rlgym-sim-rs gamestate
 
-use std::f32::consts::E;
-
 use pyo3::{PyAny, types::PyList};
-use rlgym_sim_rs::gamestates::game_state::GameState;
+use rlgym_sim_rs::gamestates::{game_state::GameState, player_data::PlayerData};
+use rocketsim_rs::sim::CarControls;
 
 //blue_score = 1
 //orange_score = 2
@@ -53,8 +52,27 @@ pub fn get_state(obj: &PyAny) -> GameState{
         state_floats.push(extract_attr!(player, has_flip));
         state_floats.push(extract_attr!(player, boost_amount));
     }
-    // dbg!(state_floats.clone());
     GameState::new(Some(state_floats))
+}
+
+pub fn get_player(player: &PyAny) -> PlayerData{
+    let mut player_floats = Vec::<f32>::with_capacity(PLAYER_INFO_LENGTH);
+    player_floats.push(extract_attr!(player, car_id));
+    player_floats.push(extract_attr!(player, team_num));
+    player_floats.extend(get_car_physics_object_floats(extract_attr!(player, car_data)));
+    player_floats.extend(get_car_physics_object_floats(extract_attr!(player, inverted_car_data)));
+    player_floats.push(extract_attr!(player, match_goals));
+    player_floats.push(extract_attr!(player, match_saves));
+    player_floats.push(extract_attr!(player, match_shots));
+    player_floats.push(extract_attr!(player, match_demolishes));
+    player_floats.push(extract_attr!(player, boost_pickups));
+    player_floats.push(extract_attr!(player, is_demoed));
+    player_floats.push(extract_attr!(player, on_ground));
+    player_floats.push(extract_attr!(player, ball_touched));
+    player_floats.push(extract_attr!(player, has_jump));
+    player_floats.push(extract_attr!(player, has_flip));
+    player_floats.push(extract_attr!(player, boost_amount));
+    decode_player_precompute(&player_floats)
 }
 
 
@@ -63,7 +81,6 @@ fn get_ball_object_floats(obj: &PyAny) -> Vec<f32>{
     floats.extend::<Vec<f32>>(extract_attr!(obj, position));
     floats.extend::<Vec<f32>>(extract_attr!(obj, linear_velocity));
     floats.extend::<Vec<f32>>(extract_attr!(obj, angular_velocity));
-    dbg!(floats.clone());
     floats
 }
 
@@ -73,6 +90,55 @@ fn get_car_physics_object_floats(obj: &PyAny) -> Vec<f32>{
     floats.extend::<Vec<f32>>(extract_attr!(obj, quaternion));
     floats.extend::<Vec<f32>>(extract_attr!(obj, linear_velocity));
     floats.extend::<Vec<f32>>(extract_attr!(obj, angular_velocity));
-    dbg!(floats.clone());
     floats
+}
+
+// copied from rlgym-sim-rs since it's private and this isn't Python
+fn decode_player_precompute(full_player_data: &[f32]) -> PlayerData {
+    let mut player_data = PlayerData::new();
+
+    let mut start: usize = 2;
+
+    player_data.car_data.decode_car_data(&full_player_data[start..start + PLAYER_CAR_STATE_LENGTH]);
+    start += PLAYER_CAR_STATE_LENGTH;
+
+    player_data.inverted_car_data.decode_car_data(&full_player_data[start..start + PLAYER_CAR_STATE_LENGTH]);
+    start += PLAYER_CAR_STATE_LENGTH;
+
+    let tertiary_data = &full_player_data[start..start + PLAYER_TERTIARY_INFO_LENGTH];
+
+    player_data.match_goals = tertiary_data[0] as i64;
+    player_data.match_saves = tertiary_data[1] as i64;
+    player_data.match_shots = tertiary_data[2] as i64;
+    player_data.match_demolishes = tertiary_data[3] as i64;
+    player_data.boost_pickups = tertiary_data[4] as i64;
+    player_data.is_demoed = tertiary_data[5] > 0.;
+    player_data.on_ground = tertiary_data[6] > 0.;
+    player_data.ball_touched = tertiary_data[7] > 0.;
+    player_data.has_jump = tertiary_data[8] > 0.;
+    player_data.has_flip = tertiary_data[9] > 0.;
+    player_data.boost_amount = tertiary_data[10];
+    player_data.car_id = full_player_data[0] as i32;
+    player_data.team_num = full_player_data[1] as i32;
+
+    // player_data.car_data.euler_angles();
+    // player_data.inverted_car_data.euler_angles();
+
+    player_data.car_data.rotation_mtx();
+    player_data.inverted_car_data.rotation_mtx();
+
+    player_data
+}
+
+pub fn get_car_controls_from_vec(action: &[f64]) -> CarControls{
+    CarControls {
+        throttle: action[0] as f32,
+        steer: action[1] as f32,
+        pitch: action[2] as f32,
+        yaw: action[3] as f32,
+        roll: action[4] as f32,
+        jump: action[5] > 0.,
+        boost: action[6] > 0.,
+        handbrake: action[7] > 0.,
+    }
 }
