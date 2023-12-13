@@ -69,17 +69,14 @@ fn rlbot_rust_compat(_py: Python, m: &PyModule) -> PyResult<()> {
 //     pub sim_wrapper: RocketsimWrapper,
 // }
 
-// #[pyclass(unsendable)]
-// struct CompatReward{
-//     pub reward_fn: Box<dyn RewardFn>,
-// }
+#[pyclass(unsendable)]
+struct CompatReward{
+    pub reward_fn: Box<dyn RewardFn>,
+}
 
 #[pyclass(unsendable)]
 struct CompatObs{
     pub obs_builder: Box<dyn ObsBuilder>,
-    previous_actions: Vec<Vec<f32>>,
-    // simulator: RocketsimWrapper,
-    game_config: GameConfig,
 }
 
 // #[pymethods]
@@ -116,18 +113,18 @@ impl CompatObs {
         // let gamestate = make_sim_state(py_state);
         // let state = self.simulator.get_rlgym_gamestate(false).0;
         let state = get_state(py_state);
-        dbg!(state.ball.angular_velocity.z);
-        dbg!(state.players[0].car_id);
-        dbg!(state.players[0].team_num);
-        dbg!(state.players[0].car_data.position.x);
-        dbg!(state.players[0].car_data.angular_velocity.z);
-        dbg!(state.players[3].car_id);
-        dbg!(state.players[3].car_data.position.z);
-        dbg!(state.players[3].team_num);
-        dbg!(state.boost_pads[3]);
-        dbg!(state.inverted_boost_pads[30]);
-        dbg!(state.boost_pads[2]);
-        dbg!(state.inverted_boost_pads[32]);
+        // dbg!(state.ball.angular_velocity.z);
+        // dbg!(state.players[0].car_id);
+        // dbg!(state.players[0].team_num);
+        // dbg!(state.players[0].car_data.position.x);
+        // dbg!(state.players[0].car_data.angular_velocity.z);
+        // dbg!(state.players[3].car_id);
+        // dbg!(state.players[3].car_data.position.z);
+        // dbg!(state.players[3].team_num);
+        // dbg!(state.boost_pads[3]);
+        // dbg!(state.inverted_boost_pads[30]);
+        // dbg!(state.boost_pads[2]);
+        // dbg!(state.inverted_boost_pads[32]);
         self.obs_builder.reset(&state);
     }
 
