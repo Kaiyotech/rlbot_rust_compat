@@ -19,4 +19,4 @@ rand = { version = "0.8.5", features = ["small_rng"] }
 # rlgym_sim_rs = "0.3.0-alpha"
 rlgym_sim_rs = { version = "0.7.0-alpha", path = "../rlgym-sim-rs" }
 #rocketsim_rs = {version = "0.22.3", features = ["bin"], path = "../rocketsim-rs"}
-rocketsim_rs = {version = "0.22.3", features = ["bin"]}
+rocketsim_rs = {version = "0.23.0", features = ["bin"]}
