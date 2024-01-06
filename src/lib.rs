@@ -6,7 +6,7 @@ use pyo3::{prelude::*, pymodule, types::PyModule, PyResult, Python};
 use numpy::{PyReadonlyArray, PyArray};
 
 use rlgym_sim_rs::{AdvancedObs, reward_functions::{common_rewards::player_ball_rewards::VelocityPlayerToBallReward, reward_fn::RewardFn},
- envs::game_match::GameConfig, obs_builders::obs_builder::ObsBuilder};
+ envs::game_match::GameConfig, obs_builders::obs_builder::ObsBuilder, gamestates::game_state::GameState};
 
 pub use python_to_rust_state::{get_state, get_car_controls_from_vec, get_player};
 pub use rust_to_python_state::set_state;
@@ -23,6 +23,7 @@ fn rlbot_rust_compat(_py: Python, m: &PyModule) -> PyResult<()> {
 struct CompatObs{
     pub obs_builder: Box<dyn ObsBuilder>,
     pub gameconfig: GameConfig,
+    state: GameState,
 }
 
 #[pymethods]
@@ -33,11 +34,12 @@ impl CompatObs {
         let gameconfig = GameConfig{ gravity: 1., boost_consumption: 1., team_size, tick_skip, spawn_opponents};
         // replace your obs builder here
         let obs_builder = Box::new(AdvancedObs::new());
-        CompatObs{obs_builder, gameconfig}
+        let state = GameState::default();
+        CompatObs{obs_builder, gameconfig, state}
     }
     pub fn reset(&mut self, py_state: &PyAny){
-        let state = get_state(py_state);
-        self.obs_builder.reset(&state);
+        self.state = get_state(py_state);
+        self.obs_builder.reset(&self.state);
     }
 
     fn pre_step(&mut self, py_state: &PyAny, previous_actions: PyReadonlyArray<f64, Ix2>){
@@ -49,10 +51,8 @@ impl CompatObs {
         self.obs_builder.pre_step(&state, &self.gameconfig);
     }
 
-    fn build_obs(&mut self, py: Python<'_>, py_player: &PyAny, py_state: &PyAny, _previous_action: PyReadonlyArray<f64, Ix1>) -> PyResult<Py<PyArray<f32, Ix1>>>{
-        let state = get_state(py_state);
-        let player = get_player(py_player);
-        let obs = self.obs_builder.build_obs(&player, &state, &self.gameconfig);
+    fn build_obs(&mut self, py: Python<'_>, player_index: usize) -> PyResult<Py<PyArray<f32, Ix1>>>{
+        let obs = self.obs_builder.build_obs(&self.state.players[player_index], &self.state, &self.gameconfig);
         let obs_array = PyArray::from_vec(py, obs).into();
         Ok(obs_array)
     }

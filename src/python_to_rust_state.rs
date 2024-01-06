@@ -1,7 +1,7 @@
 // takes a python object and makes it into a rlgym-sim-rs gamestate
 
 use pyo3::{PyAny, types::PyList};
-use rlgym_sim_rs::gamestates::{game_state::GameState, player_data::PlayerData};
+use rlgym_sim_rs::gamestates::{game_state::GameState, player_data::PlayerData, physics_object::{Quaternion, EulerAngle, RotationMatrix}};
 use rocketsim_rs::sim::CarControls;
 
 //blue_score = 1
@@ -24,6 +24,7 @@ macro_rules! extract_attr {
 }
 
 pub fn get_state(obj: &PyAny) -> GameState{
+    // dbg!("hello");
     let mut state_floats = Vec::<f32>::with_capacity(MAX_SIZE);
     // state_floats.push(obj.getattr("blue_score").unwrap().extract().unwrap());
     state_floats.push(0.); // game type but not used
@@ -52,7 +53,19 @@ pub fn get_state(obj: &PyAny) -> GameState{
         state_floats.push(extract_attr!(player, has_flip));
         state_floats.push(extract_attr!(player, boost_amount));
     }
-    GameState::new(Some(state_floats))
+    let mut state = GameState::new(Some(state_floats));
+    for player_data in state.players.iter_mut(){
+        player_data.car_data.euler_angles = euler_angles(player_data.car_data.quaternion);
+        player_data.inverted_car_data.euler_angles = euler_angles(player_data.inverted_car_data.quaternion);
+        player_data.car_data.has_computed_euler_angles = true;
+        player_data.inverted_car_data.has_computed_euler_angles = true;
+
+        player_data.car_data.rotation_mtx = rotation_mtx(player_data.car_data.quaternion);
+        player_data.inverted_car_data.rotation_mtx = rotation_mtx(player_data.inverted_car_data.quaternion);
+        player_data.car_data.has_computed_rot_mtx = true;
+        player_data.inverted_car_data.has_computed_rot_mtx = true;
+    }
+    state
 }
 
 pub fn get_player(player: &PyAny) -> PlayerData{
@@ -121,11 +134,18 @@ fn decode_player_precompute(full_player_data: &[f32]) -> PlayerData {
     player_data.car_id = full_player_data[0] as i32;
     player_data.team_num = full_player_data[1] as i32;
 
-    // player_data.car_data.euler_angles();
-    // player_data.inverted_car_data.euler_angles();
+    player_data.car_data.euler_angles = euler_angles(player_data.car_data.quaternion);
+    player_data.inverted_car_data.euler_angles = euler_angles(player_data.inverted_car_data.quaternion);
+    player_data.car_data.has_computed_euler_angles = true;
+    player_data.inverted_car_data.has_computed_euler_angles = true;
 
-    player_data.car_data.rotation_mtx();
-    player_data.inverted_car_data.rotation_mtx();
+    player_data.car_data.rotation_mtx = rotation_mtx(player_data.car_data.quaternion);
+    player_data.inverted_car_data.rotation_mtx = rotation_mtx(player_data.inverted_car_data.quaternion);
+    player_data.car_data.has_computed_rot_mtx = true;
+    player_data.inverted_car_data.has_computed_rot_mtx = true;
+
+    // dbg!(player_data.car_data.euler_angles);
+    // dbg!(player_data.car_data.rotation_mtx);
 
     player_data
 }
@@ -141,4 +161,14 @@ pub fn get_car_controls_from_vec(action: &[f64]) -> CarControls{
         boost: action[6] > 0.,
         handbrake: action[7] > 0.,
     }
+}
+
+pub fn euler_angles(quat: Quaternion) -> EulerAngle {
+    // dbg!(quat);
+
+    quat.quat_to_euler()
+}
+
+pub fn rotation_mtx(quat: Quaternion) -> RotationMatrix {
+    quat.quat_to_rot_mtx()
 }
