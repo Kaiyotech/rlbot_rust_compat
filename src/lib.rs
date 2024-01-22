@@ -1,5 +1,6 @@
 mod python_to_rust_state;
 mod rust_to_python_state;
+mod rust_state_from_vec;
 
 use ndarray::{Ix2, Ix1, ArrayView2, Axis};
 use pyo3::{prelude::*, pymodule, types::PyModule, PyResult, Python};

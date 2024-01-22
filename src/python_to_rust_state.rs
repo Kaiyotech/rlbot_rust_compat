@@ -4,6 +4,8 @@ use pyo3::{PyAny, types::PyList};
 use rlgym_sim_rs::gamestates::{game_state::GameState, player_data::PlayerData, physics_object::{Quaternion, EulerAngle, RotationMatrix}};
 use rocketsim_rs::sim::CarControls;
 
+use crate::rust_state_from_vec::StateFromVec;
+
 //blue_score = 1
 //orange_score = 2
 //boost = 3 through length + 3 (34 length)
@@ -53,7 +55,7 @@ pub fn get_state(obj: &PyAny) -> GameState{
         state_floats.push(extract_attr!(player, has_flip));
         state_floats.push(extract_attr!(player, boost_amount));
     }
-    let mut state = GameState::new(Some(state_floats));
+    let mut state = GameState::new_from_vec(state_floats);
     for player_data in state.players.iter_mut(){
         player_data.car_data.euler_angles = euler_angles(player_data.car_data.quaternion);
         player_data.inverted_car_data.euler_angles = euler_angles(player_data.inverted_car_data.quaternion);

@@ -19,8 +19,10 @@ pub fn set_state(state: GameState) -> Vec<f32>{
     state_floats.push(0.); // game type but not used
     state_floats.push(state.blue_score as f32);
     state_floats.push(state.orange_score as f32);
-    state_floats.extend(state.boost_pads);
-    state_floats.extend(state.inverted_boost_pads);
+
+    // TODO make the boost pads better match eventually?
+    state_floats.extend(state.boost_pads.iter().map(|pad| pad.state.is_active as u8 as f32));
+    state_floats.extend(state.inverted_boost_pads.iter().map(|pad| pad.state.is_active as u8 as f32));
     state_floats.extend(get_ball_object_floats(&state.ball));
     state_floats.extend(get_ball_object_floats(&state.inverted_ball));
 
