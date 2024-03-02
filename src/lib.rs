@@ -75,7 +75,7 @@ impl CompatReward{
     }
     pub fn reset(&mut self, py_state: &PyAny){
         let state = get_state(py_state);
-        self.reward_fn.reset(&state);
+        self.reward_fn.reset(&state, None);
     }
 
     fn pre_step(&mut self, py_state: &PyAny, previous_actions: PyReadonlyArray<f64, Ix2>){
