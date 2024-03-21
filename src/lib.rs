@@ -10,6 +10,7 @@ use rlgym_sim_rs::{AdvancedObs, reward_functions::{common_rewards::player_ball_r
  envs::game_match::GameConfig, obs_builders::obs_builder::ObsBuilder, gamestates::game_state::GameState};
 
 pub use python_to_rust_state::{get_state, get_car_controls_from_vec, get_player};
+use rocketsim_rs::sim::CarConfig;
 pub use rust_to_python_state::set_state;
 
 #[pymodule]
@@ -32,7 +33,7 @@ impl CompatObs {
     #[new]
     pub fn new(team_size: usize, tick_skip: usize, spawn_opponents: bool) -> CompatObs {
         // replace your game config here as necessary
-        let gameconfig = GameConfig{ gravity: 1., boost_consumption: 1., team_size, tick_skip, spawn_opponents};
+        let gameconfig = GameConfig{ gravity: 1., boost_consumption: 1., team_size, tick_skip, spawn_opponents, car_config: CarConfig::octane(),};
         // replace your obs builder here
         let obs_builder = Box::new(AdvancedObs::new());
         let state = GameState::default();

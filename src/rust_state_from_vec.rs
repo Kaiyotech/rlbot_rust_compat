@@ -2,13 +2,11 @@
 
 // use rayon::prelude::*;
 
-use rocketsim_rs::sim::{BallHitInfo, CarControls};
 // use serde::{Serialize, Deserialize};
 
-use rlgym_sim_rs::common_values::BLUE_TEAM;
 use rlgym_sim_rs::gamestates::player_data::PlayerData;
 
-use rlgym_sim_rs::gamestates::{game_state::GameState, physics_object::{Position, Velocity,PhysicsObject}};
+use rlgym_sim_rs::gamestates::{game_state::GameState, physics_object::PhysicsObject};
 use rocketsim_rs::BoostPad;
 
 
