@@ -18,5 +18,5 @@ pyo3 = "0.20.0"
 rand = { version = "0.8.5", features = ["small_rng"] }
 # rlgym_sim_rs = "0.3.0-alpha"
 rlgym_sim_rs = { version = "0.8.0-alpha", path = "../rlgym-sim-rs" }
-rocketsim_rs = {version = "0.24.3", features = ["bin"], path = "../rocketsim-rs"}
+rocketsim_rs = {version = "0.28.1", features = ["bin"], path = "../rocketsim-rs"}
 #rocketsim_rs = {version = "0.24.2", features = ["bin"]}
